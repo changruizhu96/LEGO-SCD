@@ -10,6 +10,27 @@ import sys
 from evaluate import PASLCD_SCENES
 
 
+def ensure_decoder(source):
+    directory = Path("models/gsedit_scd/sam2_decoder_aot")
+    variants = ("box_single", "box_multiple", "point_single", "point_multiple")
+    if all(len(list((directory / name).glob("*.so"))) == 1
+           and any((directory / name).glob("*.cubin")) for name in variants):
+        return
+    if directory.exists():
+        raise FileExistsError(
+            f"Incomplete SAM2 acceleration files in {directory}. "
+            "Move this directory aside before retrying; existing files will not be overwritten.")
+    images = sorted(path for path in (source / "reference_scene/images").iterdir()
+                    if path.is_file() and path.suffix.lower() in (".jpg", ".jpeg", ".png"))
+    if not images:
+        raise FileNotFoundError(f"No reference image for SAM2 compilation in {source}")
+    command = [sys.executable, "-m", "gsedit_scd.compile_decoder",
+               "--reference-image", str(images[0]), "--output", str(directory)]
+    print("Compiling shared SAM2 acceleration files before inference (not training or timed inference).", flush=True)
+    print(shlex.join(command), flush=True)
+    subprocess.run(command, check=True)
+
+
 def summarize(jobs, refine):
     runs = []
     for item, repeat, directory in jobs:
@@ -70,6 +91,8 @@ def main():
         for _, _, directory in jobs:
             if directory.exists() and any(directory.iterdir()):
                 parser.error(f"Output already exists: {directory}. Use --summarize-only or a new --output.")
+        if not args.pixel_only:
+            ensure_decoder(args.data_root / jobs[0][0])
         for item, _, directory in jobs:
             source = args.data_root / item
             parameters = (args.training_root / item / "parameters" if args.training_root

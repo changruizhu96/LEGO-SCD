@@ -146,22 +146,11 @@ for evaluation.
 
 #### Run PASLCD Full-20
 
-Before running the full pipeline for the first time, run the command below to
-build acceleration files for the SAM2 decoder used in output refinement.
-**This compiles the existing model; it does not retrain it.** The reference image
-provides example inputs for compilation. You only need to do this once for the
-same GPU and PyTorch environment: all scenes in both PASLCD and CCS3D share the
-compiled files, which inference loads automatically.
-
-Skip this step if compilation has already succeeded in this environment, or if
-you only use `--pixel-only`. For a new compilation, the output directory must not
-already exist.
-
-```bash
-python -m gsedit_scd.compile_decoder \
-  --reference-image data/PASLCD/Instance_1/Cantina/reference_scene/images/Inst_1_IMG_3065.jpg \
-  --output models/gsedit_scd/sam2_decoder_aot
-```
+The full pipeline automatically checks for the shared SAM2 acceleration files.
+If they are missing, it compiles them from a reference image before inference.
+**This is compilation, not retraining**, and only needs to happen once in the same
+GPU and PyTorch environment. All scenes in PASLCD and CCS3D reuse these files.
+`--pixel-only` skips decoder compilation.
 
 Run all 20 instances and evaluate both pixel and refined outputs:
 
@@ -271,17 +260,9 @@ Each prepared scene has the same reference/inference layout as PASLCD, plus
 
 #### Run all four scenes
 
-If you already compiled the SAM2 acceleration files for PASLCD in the same GPU
-and PyTorch environment, reuse them and skip this step. Otherwise, run the command
-below using a CCS3D reference image. This compiles the existing model, without
-retraining, and only needs to be done once. Skip it for `--pixel-only` runs.
-
-```bash
-reference=(data/CCS3D/livingroom/reference_scene/images/*.png)
-python -m gsedit_scd.compile_decoder \
-  --reference-image "${reference[0]}" \
-  --output models/gsedit_scd/sam2_decoder_aot
-```
+SAM2 acceleration files are checked automatically, just as for PASLCD. Existing
+files are reused; if missing, they are compiled from a CCS3D reference image.
+`--pixel-only` skips this step.
 
 Run all four scenes and evaluate both pixel and refined outputs:
 
@@ -318,6 +299,25 @@ The first run initializes the models and compiles the SAM2 encoder.
 
 Existing prediction directories are not overwritten. For a new run, set a new
 `--output`; to score saved predictions, use [Evaluate existing predictions](#evaluate-existing-predictions).
+
+<details>
+<summary>Optional: compile SAM2 acceleration files in advance</summary>
+
+The evaluation and timing commands do this automatically for the full pipeline.
+To prepare the files separately, use any reference image, for example:
+
+```bash
+python -m gsedit_scd.compile_decoder \
+  --reference-image data/PASLCD/Instance_1/Cantina/reference_scene/images/Inst_1_IMG_3065.jpg \
+  --output models/gsedit_scd/sam2_decoder_aot
+```
+
+The output directory must not already exist. If an interrupted compilation left
+incomplete files, move that directory aside and rerun the evaluation or timing
+command. Existing files are never overwritten automatically. If you change the GPU
+or PyTorch environment, move the old compiled directory aside so it can be rebuilt.
+
+</details>
 
 ## Train your own parameters
 
@@ -395,7 +395,7 @@ python run_training.py PASLCD --scene Cantina --instance Instance_1 \
   --checked-root data/checked_trial/PASLCD --output outputs/training_trial/PASLCD
 ```
 
-After compiling the shared decoder as in Quick start, detect and evaluate this trial:
+Detect and evaluate this trial (decoder compilation is automatic when needed):
 
 ```bash
 python run_evaluation.py PASLCD --scene Cantina --instance Instance_1 \
@@ -407,8 +407,8 @@ python run_evaluation.py PASLCD --scene Cantina --instance Instance_1 \
 
 ### Detect with your fitted parameters
 
-Compile the shared decoder as in Quick start if it is not already available. Then
-use the same evaluation entry, pointing it to your checked data and training outputs:
+Use the same evaluation entry, pointing it to your checked data and training outputs.
+The full pipeline automatically prepares the shared decoder if needed:
 
 ```bash
 python run_evaluation.py PASLCD --data-root data/checked/PASLCD \
@@ -446,7 +446,9 @@ maps. Encoding and writing these images adds overhead between frames and changes
 continuous FPS. With `--timing`, the first pass saves predictions for accuracy;
 the second measures detection without those writes. This gives both results in
 one command while keeping the existing timing protocol. Timing itself runs only
-once; `--timing-only` skips the accuracy pass entirely.
+once; `--timing-only` skips the accuracy pass entirely. Any required decoder
+compilation runs before the inference process starts. Compilation and initialization
+are excluded from the reported sequence time and FPS.
 
 Timing results go under `<output>/timing/`. The default full-pipeline summary is
 `outputs/evaluation/PASLCD/full/timing/full_summary.json`; pixel-only timing uses
