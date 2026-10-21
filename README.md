@@ -17,8 +17,13 @@ without modifying the accumulated history.
 
 ## Install
 
+Run the command blocks below in a Bash terminal. Directory listings are labelled
+**Expected directory structure** and are for comparison, not terminal input.
+Follow the commands for your chosen dataset and route. Alternative modes and
+optional examples are labelled; they are not additional required steps.
+
 Clone the repository, which includes the fitted scene parameters and fixed
-initialization examples:
+initialization examples; these need no separate download:
 
 ```bash
 git clone https://github.com/changruizhu96/learning-from-edits-for-scd.git
@@ -109,6 +114,8 @@ including the reference reconstructions and query labels. Use the
 [online release](https://huggingface.co/datasets/ChamudithaJay/PASLCD/blob/main/PASLCD_online.zip)
 with the bundled checkpoints.
 
+**Run in the terminal to download and extract:**
+
 ```bash
 mkdir -p data/downloads
 hf download ChamudithaJay/PASLCD PASLCD_online.zip \
@@ -118,7 +125,10 @@ unzip data/downloads/PASLCD_online.zip -d data
 
 The extracted scenes should be under `data/PASLCD/Instance_1/` and
 `data/PASLCD/Instance_2/`. Matching fitted parameters for all 20 instances are
-included under `pretrained/PASLCD/`. Cantina's layout is shown below:
+included under `pretrained/PASLCD/`.
+
+**Expected directory structure after extraction (not commands):**
+Cantina is shown as an example.
 
 ```text
 data/PASLCD/Instance_1/Cantina/
@@ -186,6 +196,8 @@ Download the [CCS3D dataset](https://huggingface.co/datasets/zr-zhou/CCS3D)
 and the authors' [reference reconstructions](https://huggingface.co/zr-zhou/CCS3D-pretrained).
 Both archives are named `CCS3D.zip`, so save them in separate directories:
 
+**Run in the terminal to download and extract:**
+
 ```bash
 mkdir -p data/downloads/ccs3d-data data/downloads/ccs3d-models
 hf download zr-zhou/CCS3D CCS3D.zip --repo-type dataset \
@@ -198,6 +210,10 @@ unzip data/downloads/ccs3d-models/CCS3D.zip -d data/downloads
 
 The archives include their top-level directories, giving the layout expected by
 the adapter:
+
+**Expected directory structure after extraction (not commands):**
+`<scene>` stands for `livingroom`, `desk`, `bookcase`, or `bedroom`; `*.png`
+represents the image files already present in each folder.
 
 ```text
 data/downloads/CCS3D/<scene>/
@@ -221,6 +237,8 @@ place. Original files are not modified; the output directory must be new or empt
 First adapt all four scenes. This step is shared by checkpoint inference and
 training from scratch. Skip it if these adapted scenes already exist:
 
+**Run the entire block in the terminal; it processes all four scenes automatically:**
+
 ```bash
 (
 set -e
@@ -233,7 +251,7 @@ done
 )
 ```
 
-These are Bash commands. The adapted scenes contain:
+After preparation, the adapted scenes contain:
 
 | Scene | Reference images | Test-post queries |
 | --- | ---: | ---: |
