@@ -89,12 +89,10 @@ python -m pip install --no-build-isolation --no-deps ./submodules/diff-gaussian-
 python -m pip install --no-build-isolation --no-deps ./submodules/simple-knn
 ```
 
-Download SAM2 into the Hugging Face cache before fitting or inference, since the
-method loads it with `local_files_only=True`:
-
-```bash
-python -c "from huggingface_hub import snapshot_download; snapshot_download('facebook/sam2.1-hiera-tiny')"
-```
+SAM2 is checked automatically during data preparation and before training or
+inference. Complete cached model files are reused without network access; missing
+files are downloaded from `facebook/sam2.1-hiera-tiny` into the Hugging Face cache.
+Downloads finish before compilation and inference, outside the timing window.
 
 Registration uses XFeat from `verlab/accelerated_features` through PyTorch Hub.
 Its first use requires internet access unless the model and weights are already
@@ -109,19 +107,16 @@ continue to [Train your own parameters](#train-your-own-parameters).
 
 ### Get PASLCD Full-20
 
-Download **PASLCD_online.zip**, which contains both instances of all ten scenes,
-including the reference reconstructions and query labels. Use the
-[online release](https://huggingface.co/datasets/ChamudithaJay/PASLCD/blob/main/PASLCD_online.zip)
-with the bundled checkpoints.
-
-**Run in the terminal to download and extract:**
+**Run in the terminal to download, extract, and prepare PASLCD:**
 
 ```bash
-mkdir -p data/downloads
-hf download ChamudithaJay/PASLCD PASLCD_online.zip \
-  --repo-type dataset --local-dir data/downloads
-unzip data/downloads/PASLCD_online.zip -d data
+python prepare_data.py PASLCD
 ```
+
+This downloads the authors' [PASLCD online release](https://huggingface.co/datasets/ChamudithaJay/PASLCD/blob/main/PASLCD_online.zip),
+which includes both instances of all ten scenes, reference reconstructions, and
+query labels. It also checks the shared SAM2 model files. No manual unzip step is
+needed. If this dataset is already prepared, skip this command and run evaluation.
 
 The extracted scenes should be under `data/PASLCD/Instance_1/` and
 `data/PASLCD/Instance_2/`. Matching fitted parameters for all 20 instances are
@@ -187,38 +182,30 @@ python run_evaluation.py PASLCD --scene Cantina --instance Instance_1 --pixel-on
 
 #### Prepare CCS3D
 
-Download the [CCS3D dataset](https://huggingface.co/datasets/zr-zhou/CCS3D)
-and the authors' [reference reconstructions](https://huggingface.co/zr-zhou/CCS3D-pretrained).
-Both archives are named `CCS3D.zip`, so save them in separate directories:
-
-**Run in the terminal to download and extract:**
+**Run in the terminal to download, extract, and prepare all four CCS3D scenes:**
 
 ```bash
-mkdir -p data/downloads/ccs3d-data data/downloads/ccs3d-models
-hf download zr-zhou/CCS3D CCS3D.zip --repo-type dataset \
-  --local-dir data/downloads/ccs3d-data
-hf download zr-zhou/CCS3D-pretrained CCS3D.zip \
-  --local-dir data/downloads/ccs3d-models
-unzip data/downloads/ccs3d-data/CCS3D.zip -d data/downloads
-unzip data/downloads/ccs3d-models/CCS3D.zip -d data/downloads
+python prepare_data.py CCS3D
 ```
 
-The archives include their top-level directories, giving the layout expected by
-the adapter:
+This downloads the [CCS3D dataset](https://huggingface.co/datasets/zr-zhou/CCS3D)
+and the authors' [reference reconstructions](https://huggingface.co/zr-zhou/CCS3D-pretrained),
+extracts them, runs the existing adapter for all four scenes, and checks SAM2.
+There is no separate extraction command or scene loop to run. If CCS3D is already
+prepared, skip this command and run evaluation.
 
-**Expected directory structure after extraction (not commands):**
-`<scene>` stands for `livingroom`, `desk`, `bookcase`, or `bedroom`; `*.png`
-represents the image files already present in each folder.
+**Expected directory structure after preparation (not commands):**
+`<scene>` stands for `livingroom`, `desk`, `bookcase`, or `bedroom`.
 
 ```text
-data/downloads/CCS3D/<scene>/
-  train-pre/*.png
-  sparse/0/
-  test-post/whole_*.png
-  gt-pre-mask/gt_*.png
-  gt-post-mask/gt_*.png
-data/downloads/models/CCS3D/<scene>/
-  point_cloud/iteration_30000/point_cloud.ply
+data/CCS3D/<scene>/
+  reference_scene/images/
+  reference_scene/sparse/0/
+  reference_reconstruction/cameras.json
+  reference_reconstruction/point_cloud/iteration_30000/point_cloud.ply
+  inference_scene/images/
+  gt_mask/                         # evaluation only
+  gt_pre_mask/                     # evaluation only
 ```
 
 Only posed `train-pre` images are used as references; queries are `test-post`, in
@@ -226,25 +213,9 @@ filename order. `train-post` is not used. The adapter makes RGB image copies,
 renames both sets of GT masks to match query filenames, and rebuilds
 `cameras.json` from the reference COLMAP poses. It does not use the camera list
 bundled with the pretrained reconstruction, which corresponds to different views.
-The COLMAP directory and large PLY are symlinked, so keep the extracted inputs in
-place. Original files are not modified; the output directory must be new or empty.
-
-First adapt all four scenes. This step is shared by checkpoint inference and
-training from scratch. Skip it if these adapted scenes already exist:
-
-**Run the entire block in the terminal; it processes all four scenes automatically:**
-
-```bash
-(
-set -e
-for scene in livingroom desk bookcase bedroom; do
-  python prepare_ccs3d.py \
-    --dataset "data/downloads/CCS3D/$scene" \
-    --reconstruction "data/downloads/models/CCS3D/$scene" \
-    --output "data/CCS3D/$scene"
-done
-)
-```
+Extracted originals remain under `data/downloads/CCS3D/` and
+`data/downloads/models/CCS3D/`. Keep these folders: prepared scenes link to their
+COLMAP files and reconstructions. Original files are not modified.
 
 After preparation, the adapted scenes contain:
 
@@ -277,6 +248,24 @@ compilation:
 ```bash
 python run_evaluation.py CCS3D --pixel-only
 ```
+
+<details>
+<summary>Use a different data location</summary>
+
+`--data-dir` changes the parent directory for downloads and prepared datasets.
+For example, for PASLCD:
+
+```bash
+python prepare_data.py PASLCD --data-dir datasets
+python run_evaluation.py PASLCD --data-root datasets/PASLCD
+```
+
+The same option works for CCS3D. For training, pass the prepared dataset directory
+with `run_training.py --data-root`. Preparation requires empty destination folders
+and never overwrites an existing dataset. Downloaded archives are kept under
+`<data-dir>/downloads/`.
+
+</details>
 
 ### Checkpoints and outputs
 
@@ -604,6 +593,7 @@ a fresh training/inference reproduction.
 | `gsedit_scd/infer.py`, `gsedit_scd/online/` | Query registration, current-view support, historical support, closed-form Bayes factors, and refinement |
 | `gsedit_scd/register.py` | Check the offline reference subset and save its poses, or cache registered query observations |
 | `gsedit_scd/compile_decoder.py` | Compile the shared SAM2 mask decoder before inference |
+| `prepare_data.py` | Download, extract, and prepare either dataset; check shared SAM2 model files |
 | `prepare_ccs3d.py` | Adapt extracted CCS3D images, COLMAP cameras, reconstruction, and labels |
 | `run_training.py` | Check references, generate edits, and fit all scene parameters |
 | `run_evaluation.py` | Run and evaluate either dataset, with pretrained or fitted parameters |

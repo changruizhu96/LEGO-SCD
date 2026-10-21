@@ -9,6 +9,7 @@ import sys
 import evaluate as paslcd
 import evaluate_ccs3d as ccs3d
 from run_timing import ensure_decoder
+from prepare_data import ensure_sam2
 
 
 def main():
@@ -73,6 +74,7 @@ def main():
             destination = output / item / "predictions"
             if destination.exists() and any(destination.iterdir()):
                 parser.error(f"Predictions already exist: {destination}. Use --evaluate-only or a new --output.")
+        ensure_sam2()
         if not args.pixel_only:
             ensure_decoder(data / items[0])
         for item in items:

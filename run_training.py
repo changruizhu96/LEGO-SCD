@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 from evaluate import PASLCD_SCENES
+from prepare_data import ensure_sam2
 
 
 CCS3D_VIEWS = {"livingroom": 89, "desk": 96, "bookcase": 94, "bedroom": 160}
@@ -46,6 +47,7 @@ def main():
         resolution, max_side = 2, 800
 
     stages = ("reference", "edits", "fit") if args.stage == "all" else (args.stage,)
+    ensure_sam2()
     for item in items:
         source = checked / item
         target = output / item

@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from evaluate import PASLCD_SCENES
+from prepare_data import ensure_sam2
 
 
 def ensure_decoder(source):
@@ -91,6 +92,7 @@ def main():
         for _, _, directory in jobs:
             if directory.exists() and any(directory.iterdir()):
                 parser.error(f"Output already exists: {directory}. Use --summarize-only or a new --output.")
+        ensure_sam2()
         if not args.pixel_only:
             ensure_decoder(args.data_root / jobs[0][0])
         for item, _, directory in jobs:
