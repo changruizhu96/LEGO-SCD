@@ -50,7 +50,7 @@ def main():
     parser.add_argument("--pixel-only", action="store_true")
     parser.add_argument("--scene", choices=PASLCD_SCENES)
     parser.add_argument("--instance", choices=("Instance_1", "Instance_2"))
-    parser.add_argument("--repeats", type=int, default=2, help="Independent runs per instance (default: 2).")
+    parser.add_argument("--repeats", type=int, default=1, help="Independent runs per instance (default: 1).")
     parser.add_argument("--data-root", type=Path, default=Path("data/PASLCD"))
     parser.add_argument("--training-root", type=Path,
                         help="Use <root>/<instance>/<scene>/parameters and edits/training_events.tsv.")

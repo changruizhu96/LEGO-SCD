@@ -59,13 +59,25 @@ export CXX=g++-13
 export CUDAHOSTCXX="$CXX"
 ```
 
-If GCC/G++ 13 comes from Conda, set `CC` and `CXX` to its compiler executables
-(e.g. `$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-gcc` and
-`$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-g++`) and set `CUDAHOSTCXX="$CXX"`.
-For a Conda CUDA toolkit, decoder compilation may also require
-`$CUDA_HOME/targets/x86_64-linux/include` in `CPATH` and the directory containing
-`libcuda.so` in `LIBRARY_PATH`. Keep compiler-cache paths free of spaces.
-These environment settings apply to both extension builds and later decoder compilation.
+Alternatively, install the CUDA compiler and GCC/G++ 13 inside the active Conda
+environment, then use these settings instead of the system-toolkit block above:
+
+```bash
+conda install -c conda-forge cuda-nvcc=12.8 cuda-cudart-dev=12.8 \
+  cuda-driver-dev_linux-64=12.8 gcc_linux-64=13 gxx_linux-64=13 -y
+export CUDA_HOME="$CONDA_PREFIX"
+export TORCH_CUDA_ARCH_LIST="12.0"  # RTX 5090; adjust for your GPU
+export CC="$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-gcc"
+export CXX="$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-g++"
+export CUDAHOSTCXX="$CXX"
+export CPATH="$CUDA_HOME/targets/x86_64-linux/include${CPATH:+:$CPATH}"
+export LIBRARY_PATH="$CUDA_HOME/targets/x86_64-linux/lib/stubs${LIBRARY_PATH:+:$LIBRARY_PATH}"
+```
+
+The stub library is needed at link time only; do not add it to `LD_LIBRARY_PATH`.
+Keep compiler-cache paths free of spaces. These environment settings apply to
+both extension builds and later decoder compilation; export them again when
+opening a new shell.
 
 ```bash
 python -m pip install --no-build-isolation --no-deps ./submodules/diff-gaussian-rasterization_fastgs
@@ -141,6 +153,9 @@ Run all 20 instances and evaluate both pixel and refined outputs:
 python run_evaluation.py PASLCD
 ```
 
+Add `--timing` to also measure speed, or `--timing-only` to measure speed without
+accuracy evaluation. See [Online timing](#online-timing) for the measurement procedure.
+
 Results are saved to `outputs/evaluation/PASLCD/full/metrics.json`. Each instance
 has its own `predictions/` directory and starts with a fresh history.
 For pixel-only inference without decoder compilation:
@@ -167,10 +182,22 @@ python run_evaluation.py PASLCD --scene Cantina --instance Instance_1 --pixel-on
 
 #### Prepare CCS3D
 
-Download and extract the [CCS3D dataset](https://huggingface.co/datasets/zr-zhou/CCS3D)
-and the authors' [reference reconstructions](https://huggingface.co/zr-zhou/CCS3D-pretrained)
-into separate directories. The adapter expects the following extracted layout
-(`data/downloads/` is an example location separate from the prepared `data/CCS3D/` tree):
+Download the [CCS3D dataset](https://huggingface.co/datasets/zr-zhou/CCS3D)
+and the authors' [reference reconstructions](https://huggingface.co/zr-zhou/CCS3D-pretrained).
+Both archives are named `CCS3D.zip`, so save them in separate directories:
+
+```bash
+mkdir -p data/downloads/ccs3d-data data/downloads/ccs3d-models
+hf download zr-zhou/CCS3D CCS3D.zip --repo-type dataset \
+  --local-dir data/downloads/ccs3d-data
+hf download zr-zhou/CCS3D-pretrained CCS3D.zip \
+  --local-dir data/downloads/ccs3d-models
+unzip data/downloads/ccs3d-data/CCS3D.zip -d data/downloads
+unzip data/downloads/ccs3d-models/CCS3D.zip -d data/downloads
+```
+
+The archives include their top-level directories, giving the layout expected by
+the adapter:
 
 ```text
 data/downloads/CCS3D/<scene>/
@@ -373,46 +400,65 @@ Both datasets use the same entry and options; PASLCD additionally uses an instan
 
 ## Online timing
 
-Timing currently covers PASLCD. After the Quick start setup, run Full-20 with the
-supplied checkpoints and fixed reference edits:
+Use the same evaluation command for all three modes. Timing currently supports
+PASLCD only:
 
 ```bash
-python run_timing.py PASLCD
+python run_evaluation.py PASLCD                # accuracy only
+python run_evaluation.py PASLCD --timing       # accuracy, then one timing pass
+python run_evaluation.py PASLCD --timing-only  # one timing pass only
 ```
 
-This runs 20 instances twice (1,000 frames), with a fresh process and history for
-each sequence, and saves `outputs/timing_full20/PASLCD/full_summary.json`.
-Use `--pixel-only` for pixel timing; its runs and `pixel_summary.json` are separate.
+Choose one command. All modes accept the same `--pixel-only`, `--scene`,
+`--instance`, `--data-root`, `--training-root`, and `--output` options.
+Timing uses the same selected inputs and fitted parameters as evaluation.
+Each timing pass covers all 20 instances once (500 frames), unless a single
+instance is selected, with a fresh process and history for each sequence.
 
-For your own fitted parameters and generated initialization edits, use the same entry:
+**Why a separate pass?** Accuracy evaluation saves predicted masks and probability
+maps. Encoding and writing these images adds overhead between frames and changes
+continuous FPS. With `--timing`, the first pass saves predictions for accuracy;
+the second measures detection without those writes. This gives both results in
+one command while keeping the existing timing protocol. Timing itself runs only
+once; `--timing-only` skips the accuracy pass entirely.
+
+Timing results go under `<output>/timing/`. The default full-pipeline summary is
+`outputs/evaluation/PASLCD/full/timing/full_summary.json`; pixel-only timing uses
+`outputs/evaluation/PASLCD/pixel/timing/pixel_summary.json`.
+Accuracy results retain their usual paths. Existing run directories are not
+overwritten; use a new `--output` for a new run. To score existing predictions
+and add timing, use `--evaluate-only --timing`.
+
+For your own fitted parameters and generated initialization edits:
 
 ```bash
-python run_timing.py PASLCD --data-root data/checked/PASLCD \
-  --training-root outputs/PASLCD --output outputs/timing_trained/PASLCD
+python run_evaluation.py PASLCD --timing \
+  --data-root data/checked/PASLCD --training-root outputs/PASLCD \
+  --output outputs/evaluation/PASLCD/trained
 ```
 
-To summarize a completed default Full-20 run without inference:
+For a single Cantina timing run:
 
 ```bash
-python run_timing.py PASLCD --summarize-only
+python run_evaluation.py PASLCD --timing-only --scene Cantina --instance Instance_1 \
+  --output outputs/timing_cantina
 ```
-
-Use the same `--output`, `--pixel-only`, and `--repeats` options as the run being
-summarized. The default is two repeats; `--repeats 1` requests one.
-Existing run directories are not overwritten; use a new `--output` for a new run.
-Missing or incomplete timing records cause an error rather than a partial summary.
 
 <details>
-<summary>Time only Cantina and summarize its two runs</summary>
+<summary>Summarize saved timings or request repeated measurements</summary>
 
-These commands use a separate output directory and matching scene selection:
+The standalone timing entry remains available and also defaults to one pass.
+To summarize the default combined command's timing files without inference:
 
 ```bash
-python run_timing.py PASLCD --scene Cantina --instance Instance_1 \
-  --output outputs/timing_cantina
-python run_timing.py PASLCD --scene Cantina --instance Instance_1 \
-  --output outputs/timing_cantina --summarize-only
+python run_timing.py PASLCD --summarize-only \
+  --output outputs/evaluation/PASLCD/full/timing
 ```
+
+Use the same scene selection and `--pixel-only` setting as the original run.
+For optional repeated measurements, use `run_timing.py --repeats N` with the dataset
+and a new `--output`; use the same `--repeats N` when summarizing those records.
+Missing or incomplete timing records cause an error rather than a partial summary.
 
 </details>
 
