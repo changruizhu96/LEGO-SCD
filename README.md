@@ -4,7 +4,7 @@
 University College London
 
 [Paper](https://arxiv.org/abs/2610.28490) ·
-[Project page](https://changruizhu96.github.io/work/learning-from-edits-for-scd/)
+[Project page](https://changruizhu96.github.io/work/lego-scd/)
 
 The method learns scene-specific evidence models from
 automatic reference edits, then detects changes through causal Bayesian evidence
@@ -26,8 +26,8 @@ Clone the repository, which includes the fitted scene parameters and fixed
 initialization examples; these need no separate download:
 
 ```bash
-git clone https://github.com/changruizhu96/learning-from-edits-for-scd.git
-cd learning-from-edits-for-scd
+git clone https://github.com/changruizhu96/LEGO-SCD.git
+cd LEGO-SCD
 ```
 
 `gsedit_scd` is the Python package name. Run the following commands from the
