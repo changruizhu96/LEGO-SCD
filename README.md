@@ -146,10 +146,16 @@ for evaluation.
 
 #### Run PASLCD Full-20
 
-For full output refinement, compile the shared SAM2 decoder once, using a reference
-image. Skip compilation if it is already built for this GPU and PyTorch environment,
-or if you only want the pixel pipeline. Compiled binaries are machine-specific;
-the output directory must not already exist.
+Before running the full pipeline for the first time, run the command below to
+build acceleration files for the SAM2 decoder used in output refinement.
+**This compiles the existing model; it does not retrain it.** The reference image
+provides example inputs for compilation. You only need to do this once for the
+same GPU and PyTorch environment: all scenes in both PASLCD and CCS3D share the
+compiled files, which inference loads automatically.
+
+Skip this step if compilation has already succeeded in this environment, or if
+you only use `--pixel-only`. For a new compilation, the output directory must not
+already exist.
 
 ```bash
 python -m gsedit_scd.compile_decoder \
@@ -265,8 +271,10 @@ Each prepared scene has the same reference/inference layout as PASLCD, plus
 
 #### Run all four scenes
 
-The decoder is shared with PASLCD. If it has not yet been built, compile it once
-from a CCS3D reference image:
+If you already compiled the SAM2 acceleration files for PASLCD in the same GPU
+and PyTorch environment, reuse them and skip this step. Otherwise, run the command
+below using a CCS3D reference image. This compiles the existing model, without
+retraining, and only needs to be done once. Skip it for `--pixel-only` runs.
 
 ```bash
 reference=(data/CCS3D/livingroom/reference_scene/images/*.png)
