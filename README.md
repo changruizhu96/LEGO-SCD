@@ -30,64 +30,50 @@ git clone https://github.com/changruizhu96/learning-from-edits-for-scd.git
 cd learning-from-edits-for-scd
 ```
 
-`gsedit_scd` is the Python package name. Run all following commands from this
-repository root. Keep temporary files and compiler caches within the checkout:
+`gsedit_scd` is the Python package name. Run the following commands from the
+repository root. Use a checkout path without spaces for compiler caches.
+
+On Linux x86_64 with Conda available and a working NVIDIA GPU driver, run:
 
 ```bash
-mkdir -p .tmp .cache
-export TMPDIR="$PWD/.tmp"
-export XDG_CACHE_HOME="$PWD/.cache"
+bash install.sh
 ```
 
-Tested on Linux with Python 3.12, PyTorch 2.11.0, CUDA 12.8, torchvision 0.26.0,
-and an NVIDIA RTX 5090. A CUDA toolkit and GCC/G++ 13 are needed to build the extensions.
+This creates a **new, separate environment** at `~/.local/share/gsedit-scd`, installs
+Python 3.12, PyTorch 2.11.0, torchvision 0.26.0, the CUDA 12.8 toolkit components,
+GCC/G++ 13 and the Python dependencies, then compiles the included FastGS and
+simple-knn extensions. The GPU architecture is detected automatically. Existing
+environments and the system CUDA installation are not modified.
+
+The installer builds our modified FastGS sources, including the required local
+fixes. **Do not replace them with the upstream version.**
+
+After installation, activate the environment in your terminal:
 
 ```bash
-conda create -n scene-change python=3.12 -y
-conda activate scene-change
-python -m pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu128
-python -m pip install -r requirements.txt
-python -m pip install setuptools wheel ninja
+conda activate ~/.local/share/gsedit-scd
 ```
 
-Build the included FastGS sources: they contain the aggregation operations used by
-this method and must not be replaced by an unmodified upstream rasterizer.
-Set the machine-specific values once below. `CUDA_HOME` must point to your
-installed CUDA toolkit (including `bin/nvcc`); the path shown is an example.
-The GPU architecture shown is for an RTX 5090.
+Activate it again in each new terminal. CUDA/compiler settings and project-local
+temporary/cache settings are applied automatically on activation; no manual `export`
+commands are needed. The software stack has been tested on an RTX 5090.
+
+<details>
+<summary>Choose another environment location</summary>
+
+The destination must not already exist. To use another location:
 
 ```bash
-export CUDA_HOME=/usr/local/cuda-12.8  # your installed toolkit directory
-export TORCH_CUDA_ARCH_LIST="12.0"     # your GPU's compute capability
-export CC=gcc-13
-export CXX=g++-13
-export CUDAHOSTCXX="$CXX"
+bash install.sh "$HOME/.local/share/gsedit-scd-custom"
+conda activate "$HOME/.local/share/gsedit-scd-custom"
 ```
 
-Alternatively, install the CUDA compiler and GCC/G++ 13 inside the active Conda
-environment, then use these settings instead of the system-toolkit block above:
+If installation stops partway through, the script leaves that environment in
+place and reports the failure. It does not remove or overwrite an existing
+environment when run again. Conda itself and the NVIDIA driver must already be
+installed; the script does not install system packages or change shell startup files.
 
-```bash
-conda install -c conda-forge cuda-nvcc=12.8 cuda-cudart-dev=12.8 \
-  cuda-driver-dev_linux-64=12.8 gcc_linux-64=13 gxx_linux-64=13 -y
-export CUDA_HOME="$CONDA_PREFIX"
-export TORCH_CUDA_ARCH_LIST="12.0"  # RTX 5090; adjust for your GPU
-export CC="$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-gcc"
-export CXX="$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-g++"
-export CUDAHOSTCXX="$CXX"
-export CPATH="$CUDA_HOME/targets/x86_64-linux/include${CPATH:+:$CPATH}"
-export LIBRARY_PATH="$CUDA_HOME/targets/x86_64-linux/lib/stubs${LIBRARY_PATH:+:$LIBRARY_PATH}"
-```
-
-The stub library is needed at link time only; do not add it to `LD_LIBRARY_PATH`.
-Keep compiler-cache paths free of spaces. These environment settings apply to
-both extension builds and later decoder compilation; export them again when
-opening a new shell.
-
-```bash
-python -m pip install --no-build-isolation --no-deps ./submodules/diff-gaussian-rasterization_fastgs
-python -m pip install --no-build-isolation --no-deps ./submodules/simple-knn
-```
+</details>
 
 SAM2 is checked automatically during data preparation and before training or
 inference. Complete cached model files are reused without network access; missing
@@ -588,6 +574,7 @@ a fresh training/inference reproduction.
 
 | Location | Purpose |
 | --- | --- |
+| `install.sh` | Create an isolated Conda environment, configure CUDA, and build the included extensions |
 | `gsedit_scd/generate.py`, `gsedit_scd/data/` | Automatic object edits, relighting, and change labels |
 | `gsedit_scd/train.py`, `gsedit_scd/learning/` | Fit response suppression, likelihood-ratio mapping, unchanged-response statistics, pixel prior, and contour filter |
 | `gsedit_scd/infer.py`, `gsedit_scd/online/` | Query registration, current-view support, historical support, closed-form Bayes factors, and refinement |
@@ -622,6 +609,9 @@ scene parameters in `pretrained/` and 20 rendered PASLCD edits in
 `examples/initialization/PASLCD/` for timing initialization.
 
 ## Validation status
+
+The new installation script has passed syntax and existing-environment protection
+checks; a full clean installation using this script has not yet been run.
 
 Verified on Linux with Python 3.12, PyTorch 2.11.0, CUDA 12.8, and an RTX 5090.
 A separate environment built both included CUDA extensions and all four SAM2
