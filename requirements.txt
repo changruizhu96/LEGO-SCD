@@ -1,0 +1,12 @@
+# Install PyTorch and torchvision first; see README.md.
+transformers==4.56.1
+numpy==2.5.2
+scipy==1.18.0
+scikit-learn==1.9.0
+opencv-contrib-python==5.0.0.93
+Pillow==12.3.0
+plyfile==1.1.5
+tqdm==4.70.0
+cupy-cuda12x==14.1.1
+huggingface-hub==0.36.2
+safetensors==0.8.0
